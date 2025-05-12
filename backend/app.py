@@ -2,16 +2,52 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # Allows access from React frontend
 
-@app.route("/alerts")
+# Default route (optional)
+@app.route('/')
+def home():
+    return '✅ Flask backend is running. Visit /alerts to get traffic alerts.'
+
+# Traffic alert data route
+@app.route('/alerts')
 def get_alerts():
-    alerts = [
-        {"type": "High Traffic", "lat": 13.0827, "lng": 80.2707, "message": "Heavy traffic in Chennai"},
-        {"type": "Animal Crossing", "lat": 13.07, "lng": 80.24, "message": "Watch for animals"},
-        {"type": "Speed Breaker", "lat": 13.1, "lng": 80.28, "message": "Speed breaker ahead"},
-    ]
-    return jsonify(alerts)
+    return jsonify([
+        {
+            "lat": 13.072,
+            "lng": 80.270,
+            "type": "Animal Crossing",
+            "message": "⚠️ Animal zone ahead"
+        },
+        {
+            "lat": 13.067,
+            "lng": 80.255,
+            "type": "Speed Breaker",
+            "message": "🚧 Speed breaker in 50m"
+        },
+        {
+            "lat": 13.065,
+            "lng": 80.245,
+            "type": "Accident Zone",
+            "message": "🛑 Frequent accidents reported"
+        }
+    ])
 
-if __name__ == "__main__":
+if __name__ == '__main__':
+    app.run(debug=True)
+from flask import Flask, jsonify
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)  # Allow frontend to fetch data
+
+@app.route('/alerts')
+def alerts():
+    return jsonify([
+        {"lat": 13.072, "lng": 80.270, "type": "Animal Crossing", "message": "⚠️ Animal zone ahead"},
+        {"lat": 13.067, "lng": 80.255, "type": "Speed Breaker", "message": "🚧 Speed breaker in 50m"},
+        {"lat": 13.065, "lng": 80.245, "type": "Accident Zone", "message": "🛑 Frequent accidents reported"}
+    ])
+
+if __name__ == '__main__':
     app.run(debug=True)
