@@ -8,9 +8,17 @@ import 'leaflet-control-geocoder';
 import 'leaflet-control-geocoder/dist/Control.Geocoder.css';
 import './MapView.css';
 
+const speak = (message) => {
+  const synth = window.speechSynthesis;
+  const utter = new SpeechSynthesisUtterance(message);
+  utter.lang = 'en-IN';
+  synth.speak(utter);
+};
+
 const MapView = () => {
   const [mapInstance, setMapInstance] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
+  const [searchedDestination, setSearchedDestination] = useState(null);
   const [routingControl, setRoutingControl] = useState(null);
 
   useEffect(() => {
@@ -53,28 +61,13 @@ const MapView = () => {
       })
       .catch(err => console.error('Error fetching alerts:', err));
 
-    const speedBreakers = [
-      { lat: 13.083, lng: 80.271 },
-      { lat: 13.078, lng: 80.265 }
-    ];
-
-    setInterval(() => {
-      if (!userLocation) return;
-
-      speedBreakers.forEach(breaker => {
-        const distance = map.distance(userLocation, L.latLng(breaker.lat, breaker.lng));
-        if (distance <= 50) {
-          alert('⚠️ Speed breaker ahead in 50 meters!');
-        }
-      });
-    }, 5000);
-
     setTimeout(() => {
       const geocoder = L.Control.geocoder({
         defaultMarkGeocode: false
       })
         .on('markgeocode', function (e) {
           const destination = e.geocode.center;
+          setSearchedDestination(destination);
           map.setView(destination, 15);
 
           L.marker(destination, {
@@ -102,28 +95,9 @@ const MapView = () => {
           }
 
           if (isInTrafficZone(destination)) {
-            alert('⚠️ You are navigating into a high traffic zone!');
-          }
-
-          if (userLocation) {
-            if (routingControl) {
-              routingControl.setWaypoints([userLocation, destination]);
-            } else {
-              const newControl = L.Routing.control({
-                waypoints: [userLocation, destination],
-                routeWhileDragging: true,
-                showAlternatives: true,
-                lineOptions: {
-                  styles: [{ color: 'blue', weight: 5 }]
-                },
-                createMarker: (i, waypoint, n) => {
-                  return L.marker(waypoint.latLng);
-                }
-              }).addTo(map);
-              setRoutingControl(newControl);
-            }
-          } else {
-            alert('User location not available. Please allow location access.');
+            const warning = 'Warning! You are navigating into a high traffic zone.';
+            alert('⚠️ ' + warning);
+            speak(warning);
           }
         })
         .addTo(map);
@@ -134,14 +108,80 @@ const MapView = () => {
     };
   }, []);
 
+  const handleShowRoute = () => {
+    if (!mapInstance || !userLocation || !searchedDestination) {
+      alert('User location or destination is missing');
+      return;
+    }
+
+    if (routingControl) {
+      routingControl.setWaypoints([userLocation, searchedDestination]);
+    } else {
+      const route = L.Routing.control({
+        waypoints: [userLocation, searchedDestination],
+        routeWhileDragging: false,
+        lineOptions: {
+          styles: [{ color: 'blue', weight: 4 }]
+        },
+        createMarker: (i, waypoint) => {
+          return L.marker(waypoint.latLng);
+        }
+      })
+        .on('routesfound', function (e) {
+          const instructions = e.routes[0].instructions;
+          instructions.forEach((inst, idx) => {
+            setTimeout(() => {
+              const direction = inst.text;
+              console.log('🔊', direction);
+              speak(direction);
+            }, idx * 3000);
+          });
+        })
+        .addTo(mapInstance);
+
+      setRoutingControl(route);
+    }
+
+    speak('Route has been displayed. Drive safe!');
+  };
+
+  const handleClearRoute = () => {
+    if (routingControl) {
+      routingControl.setWaypoints([]);
+      routingControl.remove();
+      setRoutingControl(null);
+    }
+
+    speak('Route has been cleared.');
+  };
+
   return (
     <div>
       <div id="map" style={{ height: '100vh', width: '100%' }}></div>
+
       <button
         style={{
           position: 'absolute',
           top: 10,
           left: 10,
+          zIndex: 1000,
+          padding: '10px',
+          backgroundColor: '#4CAF50',
+          color: '#fff',
+          border: 'none',
+          borderRadius: '5px',
+          cursor: 'pointer'
+        }}
+        onClick={handleShowRoute}
+      >
+        🚗 Show Route
+      </button>
+
+      <button
+        style={{
+          position: 'absolute',
+          top: 10,
+          left: 130,
           zIndex: 1000,
           padding: '10px',
           backgroundColor: '#f44336',
@@ -150,12 +190,7 @@ const MapView = () => {
           borderRadius: '5px',
           cursor: 'pointer'
         }}
-        onClick={() => {
-          if (routingControl) {
-            routingControl.setWaypoints([]);
-            routingControl.remove();
-          }
-        }}
+        onClick={handleClearRoute}
       >
         ❌ Clear Route
       </button>
