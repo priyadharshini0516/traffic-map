@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import L from 'leaflet';
 import axios from 'axios';
 import 'leaflet/dist/leaflet.css';
@@ -20,6 +20,7 @@ const MapView = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [searchedDestination, setSearchedDestination] = useState(null);
   const [routingControl, setRoutingControl] = useState(null);
+  const instructionPopupRef = useRef(null);
 
   useEffect(() => {
     const mapContainer = document.getElementById('map');
@@ -32,13 +33,43 @@ const MapView = () => {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
+    const speedBreakers = [
+      { lat: 13.0815, lng: 80.2700 },
+      { lat: 13.0840, lng: 80.2730 }
+    ];
+
+    speedBreakers.forEach(point => {
+      L.marker([point.lat, point.lng], {
+        icon: L.icon({
+          iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+          iconSize: [30, 30],
+          iconAnchor: [15, 30],
+          popupAnchor: [0, -30]
+        })
+      }).addTo(map).bindPopup('Speed Breaker');
+    });
+
     setTimeout(() => {
-      map.locate({ setView: true, maxZoom: 16 });
+      map.locate({ watch: true, setView: true, maxZoom: 16 });
     }, 300);
 
     map.on('locationfound', (e) => {
-      setUserLocation(e.latlng);
-      L.marker(e.latlng)
+      const userPos = e.latlng;
+      setUserLocation(userPos);
+
+      // Speed breaker check
+      speedBreakers.forEach(sb => {
+        const dist = map.distance(userPos, L.latLng(sb.lat, sb.lng));
+        if (dist <= 50) {
+          speak('Speed breaker ahead in 50 meters.');
+          L.popup()
+            .setLatLng(userPos)
+            .setContent('⚠️ Speed breaker ahead!')
+            .openOn(map);
+        }
+      });
+
+      L.marker(userPos)
         .addTo(map)
         .bindPopup('You are here')
         .openPopup();
@@ -132,9 +163,18 @@ const MapView = () => {
           instructions.forEach((inst, idx) => {
             setTimeout(() => {
               const direction = inst.text;
-              console.log('🔊', direction);
+              const coord = inst.latLng || userLocation;
               speak(direction);
-            }, idx * 3000);
+
+              if (instructionPopupRef.current) {
+                instructionPopupRef.current.setLatLng(coord).setContent(`📢 ${direction}`).openOn(mapInstance);
+              } else {
+                instructionPopupRef.current = L.popup({ offset: [0, -10] })
+                  .setLatLng(coord)
+                  .setContent(`📢 ${direction}`)
+                  .openOn(mapInstance);
+              }
+            }, idx * 4000);
           });
         })
         .addTo(mapInstance);
