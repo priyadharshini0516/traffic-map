@@ -10,13 +10,13 @@ html, body, #root {
   }
   
   .map-controls {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    text-align: center;
+  }
   
   .control-btn {
     padding: 8px 16px;
@@ -59,15 +59,3 @@ html, body, #root {
     max-width: 300px;
   }
   
-  .map-controls button {
-  padding: 10px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.map-controls button:hover {
-  background-color: #0056b3;
-}

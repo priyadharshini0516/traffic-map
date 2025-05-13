@@ -1,90 +1,102 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
+import 'leaflet-control-geocoder/dist/Control.Geocoder.css';
 import 'leaflet-routing-machine';
 import 'leaflet-control-geocoder';
-import 'leaflet/dist/leaflet.css';
-import 'leaflet-control-geocoder/dist/Control.Geocoder.css';
-import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import './MapView.css';
+
+import { FaRoute, FaTrashAlt, FaVolumeUp, FaVolumeMute } from 'react-icons/fa';
 
 const MapView = () => {
   const mapRef = useRef(null);
-  const routingRef = useRef(null);
+  const routeRef = useRef(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [synth] = useState(window.speechSynthesis);
-
-  const startCoords = [13.0827, 80.2707]; // Chennai by default
-  const endCoords = [13.0352, 80.2086];   // Sample destination
 
   useEffect(() => {
-    mapRef.current = L.map('map').setView(startCoords, 13);
+    if (mapRef.current !== null) return;
+
+    const map = L.map('map').setView([13.0827, 80.2707], 13);
+    mapRef.current = map;
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-    }).addTo(mapRef.current);
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
 
-    // Geocoder control
-    L.Control.geocoder({
-      defaultMarkGeocode: true,
-    }).addTo(mapRef.current);
+    L.Control.geocoder().addTo(map);
 
-    return () => {
-      mapRef.current.remove();
+    const speak = (message) => {
+      if (!voiceEnabled) return;
+      const utterance = new SpeechSynthesisUtterance(message);
+      window.speechSynthesis.speak(utterance);
     };
-  }, []);
 
-  const handleShowRoute = () => {
-    if (routingRef.current) return;
+    document.getElementById('show-route-btn').onclick = () => {
+      if (routeRef.current) {
+        map.removeControl(routeRef.current);
+      }
+      routeRef.current = L.Routing.control({
+        waypoints: [
+          L.latLng(13.0827, 80.2707),
+          L.latLng(13.067439, 80.237617)
+        ],
+        createMarker: function(i, waypoint, n) {
+          return L.marker(waypoint, { draggable: true });
+        },
+        routeWhileDragging: true
+      })
+        .on('routesfound', function (e) {
+          const summary = e.routes[0].summary;
+          speak(`Route found. Total distance is ${(summary.totalDistance / 1000).toFixed(2)} kilometers.`);
+        })
+        .addTo(map);
+    };
 
-    routingRef.current = L.Routing.control({
-      waypoints: [L.latLng(startCoords), L.latLng(endCoords)],
-      routeWhileDragging: false,
-      createMarker: function () { return null; },
-    })
-    .on('routesfound', function (e) {
-      const route = e.routes[0];
-      route.coordinates.forEach((coord, index) => {
-        // Check for 50m before any coordinate
-        if (index > 0) {
-          const dist = coord.distanceTo(route.coordinates[index - 1]);
-          if (dist > 50) {
-            if (voiceEnabled) {
-              speakText('Speed breaker ahead in 50 meters');
-            }
-          }
-        }
+    document.getElementById('clear-route-btn').onclick = () => {
+      if (routeRef.current) {
+        map.removeControl(routeRef.current);
+        routeRef.current = null;
+        speak('Route cleared');
+      }
+    };
+
+    document.getElementById('toggle-voice-btn').onclick = () => {
+      setVoiceEnabled(prev => {
+        const newState = !prev;
+        if (newState) speak("Voice guidance activated.");
+        else window.speechSynthesis.cancel();
+        return newState;
       });
-    })
-    .addTo(mapRef.current);
-  };
+    };
 
-  const handleClearRoute = () => {
-    if (routingRef.current) {
-      mapRef.current.removeControl(routingRef.current);
-      routingRef.current = null;
-    }
-  };
-
-  const speakText = (text) => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    synth.speak(utterance);
-  };
+  }, [voiceEnabled]);
 
   return (
-    <>
+    <div style={{ height: '100vh', width: '100%', position: 'relative' }}>
+      <div id="map" style={{ height: '100%', width: '100%' }}></div>
       <div className="map-controls">
-        <div className="quick-buttons">
-          <button className="quick-btn" onClick={handleShowRoute}>Show Route</button>
-          <button className="quick-btn" onClick={handleClearRoute}>Clear Route</button>
-          <button className="quick-btn" onClick={() => setVoiceEnabled(true)}>Start Voice</button>
-          <button className="quick-btn" onClick={() => {
-            synth.cancel();
-            setVoiceEnabled(false);
-          }}>Stop Voice</button>
-        </div>
+        <button className="control-btn" id="show-route-btn">
+          <FaRoute style={{ marginRight: '6px' }} />
+          Show Route
+        </button>
+        <button className="control-btn" id="clear-route-btn">
+          <FaTrashAlt style={{ marginRight: '6px' }} />
+          Clear Route
+        </button>
+        <button className="control-btn" id="toggle-voice-btn">
+          {voiceEnabled ? (
+            <>
+              <FaVolumeUp style={{ marginRight: '6px' }} /> Voice Off
+            </>
+          ) : (
+            <>
+              <FaVolumeMute style={{ marginRight: '6px' }} /> Voice On
+            </>
+          )}
+        </button>
       </div>
-      <div id="map"></div>
-    </>
+    </div>
   );
 };
 
